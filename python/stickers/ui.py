@@ -6,15 +6,41 @@
 # Andrés Méndez del Río <andres.mendez@antaruxa.com>, 2023
 # Cristina Fernandez Gomez <cristina.fernandez@antaruxa.com>, 2023
 
+"""Use of the UI
+
+    1. Seleccionamos el vertice donde queremos colocar el sticker
+    2. Rellenamos los campos:
+        - Name: nombre del sticker Ej: "eye", "mouth", "nose"
+        - Flag: flag del sticker Ej: "C", "L", "R"
+        - Index: index del sticker Ej: 0, 1, 2
+        - Layers: capas del sticker Ej: "base", "pupil", "iris"
+          (Se puede añadir dandole al boton add, o presionando Enter)
+          (Se pueden añadir mas de una layer a la vez, separandolas por una coma ',')
+    3. Click en "Create" y creara el sticker
+
+# Launch From Maya
+
+import stickers.ui
+
+try:
+    sticker_ui.close()
+    sticker_ui.deleteLater()
+except:
+    pass
+
+sticker_ui = stickers.ui.StickerUI()
+sticker_ui.show()
+"""
 import os
 import sys
 
 import maya.cmds as cmds
 import maya.OpenMayaUI as omui
-from facial_antaruxa import builder
 from PySide2 import QtCore, QtUiTools, QtWidgets
 from PySide2.QtCore import QTimer
 from shiboken2 import wrapInstance
+
+from . import builder
 
 
 def maya_main_window():
@@ -52,17 +78,10 @@ class StickerUI(QtWidgets.QDialog):
         self.ui.layout().setContentsMargins(6, 6, 6, 6)
 
     def create_connections(self):
-        self.ui.folder_path_pb.clicked.connect(self.select_folder)
-        self.ui.del_layer_pb.clicked.connect(self.delete_layer)
-        self.ui.geometry_pb.clicked.connect(self.set_geometry)
-        self.ui.add_layer_pb.clicked.connect(self.add_layer)
-        self.ui.create_pb.clicked.connect(self.create_sticker)
-        self.ui.cancel_pb.clicked.connect(self.close)
-        self.ui.add_layer_le.returnPressed.connect(self.add_layer)
-
-        self.ui.add_map_le.returnPressed.connect(self.add_map)
-        self.ui.add_map_pb.clicked.connect(self.add_map)
-        self.ui.del_map_pb.clicked.connect(self.delete_map)
+        self.ui.ui_filepath_pb.clicked.connect(self.select_folder)
+        self.ui.ui_vtx_pb.clicked.connect(self.set_geometry)
+        self.ui.ui_createsticker_pb.clicked.connect(self.create_sticker)
+        self.ui.ui_cancel_pb.clicked.connect(self.close)
 
     #   ____ ____  _____    _  _____ _____   ____ _____ ___ ____ _  _______ ____
     #  / ___|  _ \| ____|  / \|_   _| ____| / ___|_   _|_ _/ ___| |/ / ____|  _ \
@@ -113,71 +132,6 @@ class StickerUI(QtWidgets.QDialog):
         vertex_selected = cmds.ls(selection=True)[0]
         self.ui.geometry_le.setText(vertex_selected)
 
-    def delete_map(self):
-        selected_items = self.ui.maps_lw.selectedItems()
-        for item in selected_items:
-            self.ui.maps_lw.takeItem(self.ui.maps_lw.row(item))
-
-    def add_map(self):
-        current_map_name = self.ui.add_map_le.text()
-        if current_map_name == "":
-            return
-        if current_map_name.find(",") != -1:
-            maps = current_map_name.split(",")
-            for map in maps:
-                self._add_map(map.strip())
-            return
-        self._add_map(current_map_name.strip())
-
-    def _add_map(self, map_name):
-        if self.check_duplicate_map(map_name):
-            return
-        new_item = QtWidgets.QListWidgetItem()
-        new_item.setFlags(new_item.flags() | QtCore.Qt.ItemIsEditable)
-        new_item.setText(map_name)
-        self.ui.maps_lw.addItem(new_item)
-        self.ui.add_map_le.clear()
-
-    def check_duplicate_map(self, new_map_name):
-        if self.ui.maps_lw.findItems(new_map_name, QtCore.Qt.MatchExactly):
-            self.set_message_text("New maps already exists".format(new_map_name))
-            return True
-        else:
-            return False
-
-    def add_layer(self):
-        """Add a new layer to the list widget"""
-        current_layer_name = self.ui.add_layer_le.text()
-        if current_layer_name == "":
-            return
-        if current_layer_name.find(",") != -1:
-            layers = current_layer_name.split(",")
-            for layer in layers:
-                self._add_layer(layer.strip())
-            return
-        self._add_layer(current_layer_name.strip())
-
-    def check_duplicate_layer(self, new_layer_name):
-        if self.ui.layers_lw.findItems(new_layer_name, QtCore.Qt.MatchExactly):
-            self.set_message_text("New layers already exists".format(new_layer_name))
-            return True
-        else:
-            return False
-
-    def _add_layer(self, layer_name):
-        if self.check_duplicate_layer(layer_name):
-            return
-        new_item = QtWidgets.QListWidgetItem()
-        new_item.setFlags(new_item.flags() | QtCore.Qt.ItemIsEditable)
-        new_item.setText(layer_name)
-        self.ui.layers_lw.addItem(new_item)
-        self.ui.add_layer_le.clear()
-
-    def delete_layer(self):
-        selected_items = self.ui.layers_lw.selectedItems()
-        for item in selected_items:
-            self.ui.layers_lw.takeItem(self.ui.layers_lw.row(item))
-
     def set_message_text(self, message):
         self.ui.message_lbl.setText(message)
         QTimer.singleShot(4000, self.clean_message_text)
@@ -188,36 +142,3 @@ class StickerUI(QtWidgets.QDialog):
     def select_folder(self):
         folder = QtWidgets.QFileDialog.getExistingDirectory(self, "Select Folder")
         self.ui.folder_path_le.setText(folder)
-
-
-"""Show the UI
-# If python3
-# from importlib import reload
-try:
-    from facial_antaruxa.ui import sticker_simple as GUI
-
-except:
-    import sys
-    sys.path.append('/home/andres.mendez/work/tools/studio/stickers/release/maya/scripts')
-    from facial_antaruxa.ui import sticker_simple as GUI
-
-try:
-    sticker_ui.close()
-    sticker_ui.deleteLater()
-except:
-    pass
-reload(GUI)
-sticker_ui = GUI.StickerUI()
-sticker_ui.show()
-"""
-
-"""Use of the UI
-1. Seleccionamos el vertice donde queremos colocar el sticker
-2. Rellenamos los campos:
-    - Name: nombre del sticker Ej: "eye", "mouth", "nose"
-    - Flag: flag del sticker Ej: "C", "L", "R"
-    - Index: index del sticker Ej: 0, 1, 2
-    - Layers: capas del sticker Ej: "base", "pupil", "iris" (Se puede añadir dandole al boton add, o
-      presionando enter) (Se pueden añadir mas de una layer a la vez, separandolas por una coma ',')
-3. Click en "Create" y creara el sticker
-"""
