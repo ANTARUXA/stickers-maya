@@ -11,73 +11,8 @@ import os
 import re
 from pprint import pprint
 
-from .wrapper import Wrapper
-
-SUPPORTED_FORMATS = [".PNG", ".png"]
-MASTER_GROUPS = "masterGroups"
-
-STICKER_MASTER_GROUP = "stickerMaster"
-LAYERS_MASTER_GROUP = "layerMaster"
-POP_MASTER_GROUP = "popMaster"
-
-
-STICKER_SYSTEMS = "systems"
-
-SYSTEM_GEOSETUP = "geoSetup"
-SYSTEM_MAINCONTROL = "mainControl"
-SYSTEM_LOOKATCAMERA = "lookAtCamera"
-SYSTEM_GEOPLANE = "geoPlane"
-SYSTEM_LAYERS = "stickerLayers"
-
-ATTRIBUTES = "attributes"
-STICKER_ATTRIBUTES = "stickerAttributes"
-LAYER_ATTRIBUTES = "layerAttributes"
-
-CONTROLS = "controls"
-STICKER_CONTROLS = "stickerControls"
-LAYER_CONTROLS = "layerControls"
-
-STICKER_FILENODES = "fileNodes"
-
-STICKER_GEOSETUP_DRIVEN_ROOTS = "geoSetupDrivenRoots"
-
-ENUM_NICE_NAME = "_" * 6  # Six underscores
-INNIT_ATTR = {
-    STICKER_ATTRIBUTES: [
-        {
-            "type": "enum",
-            "longName": "stickerSeparator",
-            "niceName": ENUM_NICE_NAME,
-            "enumName": "STICKERS:",
-            "channelBox": True,
-        },
-        {
-            "type": "float",
-            "longName": "offsetProjection",
-            "niceName": "Margen de Proyeccion",
-        },
-        {
-            "type": "bool",
-            "longName": "lookAtCamera",
-            "niceName": "Orientar hacia Camara",
-        },
-        {"type": "bool", "longName": "detachPlane", "niceName": "Separar Plano"},
-        {
-            "type": "enum",
-            "longName": "layersSeparator",
-            "niceName": ENUM_NICE_NAME,
-            "enumName": "LAYERS:",
-            "channelBox": True,
-        },
-    ],
-    LAYER_ATTRIBUTES: [
-        {
-            "type": "long",
-            "longName": "{layerName}Texture",
-            "niceName": "{LayerName} Texture",
-        }
-    ],
-}
+from . import parser
+from .vars import *  # pylint: disable=unused-wildcard-import
 
 
 class Sticker:  # pylint: disable=too-many-instance-attributes
@@ -93,12 +28,12 @@ class Sticker:  # pylint: disable=too-many-instance-attributes
         flag="X",
         index=0,
         layers=None,
-        geometry="",
+        geometry=None,
         maps=None,
         file_path=None,
         _char_name="Argonte",
     ):
-        self.wrapper = Wrapper()
+        self.parser = parser.Parser()
         self.name = name
         self.maya_name = "{name}_{flag}{index}".format(
             name=name, flag=flag, index=index
@@ -107,7 +42,7 @@ class Sticker:  # pylint: disable=too-many-instance-attributes
         self.index = index
         self.layers = layers if layers else []
         self.texture_maps = maps if maps else []
-        self.geometry = geometry if geometry else ""
+        self.geometry = geometry if geometry else []
         print(geometry)
         print(self.geometry)
         self.geo_mesh = self.geometry.split(".")[0]
@@ -161,14 +96,14 @@ class Sticker:  # pylint: disable=too-many-instance-attributes
             self.create_layer(
                 self.root_name,
                 layer.get("layerName"),
-                self.sticker_data.get(MASTER_GROUPS).get(LAYERS_MASTER_GROUP),  # pyright: ignore[reportOptionalMemberAccess] 
+                self.sticker_data.get(MASTER_GROUPS).get(LAYERS_MASTER_GROUP),
             )
         self.create_layer_controls()
 
         self.create_attributes()
         self.create_constraints()
         self.create_offset_projection_subsystems()
-        self.build_imagefile_dict()
+        # self.build_imagefile_dict()
         self.create_layer_shading_nodes()
         self.apply_materials()
 
@@ -178,21 +113,21 @@ class Sticker:  # pylint: disable=too-many-instance-attributes
         El grupo maestro, el que recibe el pointOnPoly Constrainty y el grupo maestro de capas
         """
         # Create sticker's master group
-        sticker_master_group = self.wrapper.create_group(self.root_name)
+        sticker_master_group = self.parser.create_group(self.root_name)
         # Update sticker_data with master root
         self.sticker_data[MASTER_GROUPS].update(
             {STICKER_MASTER_GROUP: sticker_master_group}
         )
 
         # Creates PointOnPoly group, it will recieve the information of the pointOnPoly Constraint
-        pop_root = self.wrapper.create_group(
+        pop_root = self.parser.create_group(
             self.root_name + "_POP",
             parent=sticker_master_group,
         )
         self.sticker_data[MASTER_GROUPS].update({POP_MASTER_GROUP: pop_root})
 
         # Creates Layer's root group
-        layers_master_group = self.wrapper.create_group(
+        layers_master_group = self.parser.create_group(
             self.root_name + "_layers",
             parent=pop_root,
         )
@@ -209,7 +144,7 @@ class Sticker:  # pylint: disable=too-many-instance-attributes
         """
         # Obtenemos el grupo anclado a la geometria (pointOnPolyConstraint),
         # todos los sistemas iran emparentados a este grupo
-        point_on_poly_root = self.sticker_data.get(MASTER_GROUPS).get(POP_MASTER_GROUP)# pyright: ignore[reportOptionalMemberAccess]
+        point_on_poly_root = self.sticker_data.get(MASTER_GROUPS).get(POP_MASTER_GROUP)
 
         self.create_geo_setup(self.root_name, point_on_poly_root)
         self.create_main_control(self.root_name, point_on_poly_root)
@@ -227,34 +162,34 @@ class Sticker:  # pylint: disable=too-many-instance-attributes
         Returns:
             list: List of layer's nodes
         """
-        chain_name, chain_transforms = self.wrapper.create_system(
+        chain_name, chain_transforms = self.parser.create_system(
             sticker_name_string, layer_name, ["grp", "root", "cns", "ctl"]
         )
         self.sticker_data[CONTROLS][LAYER_CONTROLS].append(chain_transforms[-1])
-        self.wrapper.hierarchy_parent(chain_transforms, chain_parent)
+        self.parser.hierarchy_parent(chain_transforms, chain_parent)
         chain_transforms[1].translateZ.set(1)
 
-        layer_proyection_root = self.wrapper.create_group(
+        layer_proyection_root = self.parser.create_group(
             chain_name + "_translateOffset", parent=chain_transforms[0]
         )
 
-        ik_start = self.wrapper.create_joint(
-            chain_name + "_ik", parent=layer_proyection_root  # pyright: ignore[reportArgumentType]
+        ik_start = self.parser.create_joint(
+            chain_name + "_ik", parent=layer_proyection_root
         )
 
-        ik_end = self.wrapper.create_joint(
+        ik_end = self.parser.create_joint(
             chain_name + "_ikEnd", position=[0, 0, 1], parent=ik_start
         )
-        ik_handle, _effector = self.wrapper.create_ik_handles(
+        ik_handle, _effector = self.parser.create_ik_handles(
             name=chain_name, start_joint=ik_start, end_effector=ik_end
         )
 
-        self.wrapper.parent_nodes(ik_handle, chain_transforms[-1])
+        self.parser.parent_nodes(ik_handle, chain_transforms[-1])
 
-        layer_proyection_grp = self.wrapper.create_group(
+        layer_proyection_grp = self.parser.create_group(
             chain_name + "_scaleOffset", parent=ik_start
         )
-        layer_3d_texture = self.wrapper.create_3d_texture(
+        layer_3d_texture = self.parser.create_3d_texture(
             "place3dTexture",
             name=chain_name + "_place3dTexture",
             parent=layer_proyection_grp,
@@ -282,10 +217,8 @@ class Sticker:  # pylint: disable=too-many-instance-attributes
 
         # Runs the definition of the sticker only attributes to create
         for attr_definition in INNIT_ATTR[STICKER_ATTRIBUTES]:
-            # Runs the wrapper and returns the created attribute
-            created_attr = self.wrapper.create_attribute(
-                main_control, **attr_definition
-            )
+            # Runs the parser and returns the created attribute
+            created_attr = self.parser.create_attribute(main_control, **attr_definition)
             # Updates sticker data attributes dictionary with the created attribute (longName:attributePath)
             self.sticker_data[ATTRIBUTES][STICKER_ATTRIBUTES].update(created_attr)
 
@@ -307,9 +240,9 @@ class Sticker:  # pylint: disable=too-many-instance-attributes
                     for key, value in attr_definition.items()
                 }
 
-                # Runs the wrapper and returns the created attribute
-                created_attr = self.wrapper.create_attribute(
-                    main_control, **attr_definition  # pyright: ignore[reportArgumentType]
+                # Runs the parser and returns the created attribute
+                created_attr = self.parser.create_attribute(
+                    main_control, **attr_definition
                 )
                 # Updates sticker data attributes dictionary with the created attribute (longName:attributePath)
                 self.sticker_data[ATTRIBUTES][LAYER_ATTRIBUTES].update(created_attr)
@@ -321,7 +254,7 @@ class Sticker:  # pylint: disable=too-many-instance-attributes
         geo_setup_cns = self.create_cns_geo_setup()
         main_control_cns = self.createo_cns_main_control()
         # geoPlaneCns = self.create_cns_geo_setup()
-        self.sticker_data.get("constraints").update( # pyright: ignore[reportOptionalMemberAccess]
+        self.sticker_data.get("constraints").update(
             {SYSTEM_GEOSETUP: geo_setup_cns, SYSTEM_MAINCONTROL: main_control_cns}
         )
         # self.connect_constraint_weights(main_control_cns)
@@ -338,24 +271,24 @@ class Sticker:  # pylint: disable=too-many-instance-attributes
             list: Lista de transforms creados del sistema geoSetup
         """
         # List of all geoSetup formatted names
-        chain_name, chain_transforms = self.wrapper.create_system(
+        chain_name, chain_transforms = self.parser.create_system(
             sticker_name_string,
             SYSTEM_GEOSETUP,
             ["surface", "normalVector", "detach", "offset"],
         )
 
-        self.wrapper.hierarchy_parent(chain_transforms, chain_parent)
+        self.parser.hierarchy_parent(chain_transforms, chain_parent)
         # self.create_constraints(chain_transforms)
-        base_joint = self.wrapper.create_joint(
+        base_joint = self.parser.create_joint(
             chain_name + "_ik", parent=chain_transforms[-1]
         )
-        end_joint = self.wrapper.create_joint(
+        end_joint = self.parser.create_joint(
             chain_name + "_ikEnd",
             position=[0, 0, 1],
             parent=base_joint,
         )
 
-        ik_handle, effector = self.wrapper.create_ik_handles(
+        ik_handle, effector = self.parser.create_ik_handles(
             name=chain_name,
             start_joint=base_joint,
             end_effector=end_joint,
@@ -385,10 +318,10 @@ class Sticker:  # pylint: disable=too-many-instance-attributes
         Returns:
             list: List of lookAtCamera's nodes
         """
-        _chain_name, chain_transforms = self.wrapper.create_system(
+        _chain_name, chain_transforms = self.parser.create_system(
             sticker_name_string, "lookAtCamera", ["root", "cns", "aimSticker"]
         )
-        self.wrapper.hierarchy_parent(chain_transforms[:-1], chain_parent)
+        self.parser.hierarchy_parent(chain_transforms[:-1], chain_parent)
         self.sticker_data[STICKER_SYSTEMS].update(
             {
                 "lookAtCamera": {
@@ -398,14 +331,14 @@ class Sticker:  # pylint: disable=too-many-instance-attributes
                 }
             }
         )
-        self.wrapper.parent_nodes(chain_transforms[-1], chain_transforms[0])
-        self.wrapper.parent_nodes(
+        self.parser.parent_nodes(chain_transforms[-1], chain_transforms[0])
+        self.parser.parent_nodes(
             self.sticker_data[STICKER_SYSTEMS][SYSTEM_GEOSETUP]["ikHandle"],
             chain_transforms[1],
         )
         return chain_transforms
 
-    def create_geo_plane(self, sticker_name_string, chain_parent):
+    def create_geo_plane(self, sticker_name_string, chain_parent, _scale=2.0):
         """Crea el sistema del geoPlane
 
         Args:
@@ -416,15 +349,15 @@ class Sticker:  # pylint: disable=too-many-instance-attributes
         Returns:
             list: List of geoPlane's nodes
         """
-        chain_name, chain_transforms = self.wrapper.create_system(
+        chain_name, chain_transforms = self.parser.create_system(
             sticker_name_string, "geoPlane", ["root", "cns"]
         )
         self.sticker_data[STICKER_GEOSETUP_DRIVEN_ROOTS].append(chain_transforms[0])
-        self.wrapper.hierarchy_parent(chain_transforms, chain_parent)
-        bind_joint = self.wrapper.create_joint(
+        self.parser.hierarchy_parent(chain_transforms, chain_parent)
+        bind_joint = self.parser.create_joint(
             chain_name + "_bind", parent=chain_transforms[-1]
         )
-        plane, plane_shape = self.wrapper.create_plane(
+        plane, plane_shape = self.parser.create_plane(
             chain_name + "_geoPlane", axis=[0, 0, 1]
         )
 
@@ -451,13 +384,13 @@ class Sticker:  # pylint: disable=too-many-instance-attributes
         Returns:
             list: List of mainControl's nodes
         """
-        _chain_name, chain_transforms = self.wrapper.create_system(
+        _chain_name, chain_transforms = self.parser.create_system(
             sticker_name_string,
             "mainControl",
             ["root", "surfaceCtl", "npo", "cns", "ctl", "scaleInit"],
         )
-        self.wrapper.hierarchy_parent(chain_transforms[:-1], chain_parent)
-        self.wrapper.parent_nodes(chain_transforms[-1], chain_transforms[-4])
+        self.parser.hierarchy_parent(chain_transforms[:-1], chain_parent)
+        self.parser.parent_nodes(chain_transforms[-1], chain_transforms[-4])
         self.sticker_data[STICKER_SYSTEMS].update(
             {
                 "mainControl": {
@@ -482,14 +415,14 @@ class Sticker:  # pylint: disable=too-many-instance-attributes
         """
         # Creates a Point On Poly Constraint, driver is the vertex the system is attached on,
         # the driven is the POP_root group of the sticker
-        cns = self.wrapper.point_on_poly_constraint(
+        cns = self.parser.point_on_poly_constraint(
             self.sticker_data[MASTER_GROUPS][POP_MASTER_GROUP] + "Constraint",
             driver=self.geometry,
             driven=self.sticker_data[MASTER_GROUPS][POP_MASTER_GROUP],
         )
 
         # Geometry Constraint appplied to the first group of the geoSetup chain (Surface group)
-        surface_cns = self.wrapper.apply_constraint(
+        surface_cns = self.parser.apply_constraint(
             "geometryConstraint",
             self.geometry,
             self.sticker_data[STICKER_SYSTEMS][SYSTEM_GEOSETUP]["chain_transforms"][0],
@@ -497,7 +430,7 @@ class Sticker:  # pylint: disable=too-many-instance-attributes
         )
 
         # Normal Constraint applied to the second group of the geoSetup chain (normalVector)
-        normal_cns = self.wrapper.apply_constraint(
+        normal_cns = self.parser.apply_constraint(
             "normalConstraint",
             self.geometry,
             self.sticker_data[STICKER_SYSTEMS][SYSTEM_GEOSETUP]["chain_transforms"][1],
@@ -508,7 +441,7 @@ class Sticker:  # pylint: disable=too-many-instance-attributes
         geo_setup_roots = []
         for root in self.sticker_data[STICKER_GEOSETUP_DRIVEN_ROOTS]:
             geo_setup_roots.append(
-                self.wrapper.apply_constraint(
+                self.parser.apply_constraint(
                     "parentConstraint",
                     self.sticker_data[STICKER_SYSTEMS][SYSTEM_GEOSETUP]["joints"][0],
                     root,
@@ -528,7 +461,7 @@ class Sticker:  # pylint: disable=too-many-instance-attributes
         Returns:
             dict: Dictionary containing all the constraints created
         """
-        surface_ctl_geo_constraint = self.wrapper.apply_constraint(
+        surface_ctl_geo_constraint = self.parser.apply_constraint(
             "geometryConstraint",
             self.geometry,
             self.sticker_data[STICKER_SYSTEMS]["mainControl"]["surfaceCtl"],
@@ -536,7 +469,7 @@ class Sticker:  # pylint: disable=too-many-instance-attributes
                 self.sticker_data[STICKER_SYSTEMS]["mainControl"]["surfaceCtl"]
             ),
         )
-        surface_ctl_normal_constraint = self.wrapper.apply_constraint(
+        surface_ctl_normal_constraint = self.parser.apply_constraint(
             "normalConstraint",
             self.geometry,
             self.sticker_data[STICKER_SYSTEMS]["mainControl"]["surfaceCtl"],
@@ -546,7 +479,7 @@ class Sticker:  # pylint: disable=too-many-instance-attributes
             ),
         )
 
-        drive_geo_setup = self.wrapper.apply_constraint(
+        drive_geo_setup = self.parser.apply_constraint(
             "pointConstraint",
             self.sticker_data[STICKER_SYSTEMS]["mainControl"]["ctl"],
             self.sticker_data[STICKER_SYSTEMS][SYSTEM_GEOSETUP]["chain_transforms"][0],
@@ -565,7 +498,7 @@ class Sticker:  # pylint: disable=too-many-instance-attributes
             "reverseNode": False,
         }
 
-        detach_cns = self.wrapper.apply_constraint(
+        detach_cns = self.parser.apply_constraint(
             "parentConstraint",
             self.sticker_data[STICKER_SYSTEMS]["mainControl"]["ctl"],
             self.sticker_data[STICKER_SYSTEMS][SYSTEM_GEOSETUP]["chain_transforms"][2],
@@ -587,7 +520,7 @@ class Sticker:  # pylint: disable=too-many-instance-attributes
             },
             "reverseNode": True,
         }
-        look_at_camera_space_switch = self.wrapper.apply_constraint(
+        look_at_camera_space_switch = self.parser.apply_constraint(
             "parentConstraint",
             [
                 self.sticker_data[STICKER_SYSTEMS]["mainControl"]["ctl"],
@@ -610,15 +543,15 @@ class Sticker:  # pylint: disable=too-many-instance-attributes
     def create_sticker_controls(self):
         """Creates control shapes for both surface and main control transforms."""
         surface_ctl = self.sticker_data[CONTROLS][STICKER_CONTROLS][0]
-        self.wrapper.create_control_shape(surface_ctl, radius=1.5)
+        surface_shp = self.parser.create_control_shape(surface_ctl, radius=1.5)
         main_ctl = self.sticker_data[CONTROLS][STICKER_CONTROLS][1]
-        self.wrapper.create_control_shape(main_ctl, radius=1.2)
+        main_shp = self.parser.create_control_shape(main_ctl, radius=1.2)
 
     def create_layer_controls(self):
         """Creates control shapes for all layers created."""
         radius = 1
         for layer in self.sticker_data[CONTROLS][LAYER_CONTROLS]:
-            self.wrapper.create_control_shape(layer, radius=radius)
+            layer_shp = self.parser.create_control_shape(layer, radius=radius)
             radius -= 0.15
 
     def create_offset_projection_subsystems(self):
@@ -637,7 +570,7 @@ class Sticker:  # pylint: disable=too-many-instance-attributes
         name = "{0}_oneMinusX_halfY".format(sticker_prefix)
 
         # Create utility node
-        oneminusx_doubley = self.wrapper.create_utility_node(
+        oneminusx_doubley = self.parser.create_utility_node(
             "multiplyDivide",  # Type of utility node created
             node_name=name,  # Name of utility node
             asUtility=True,  # If it's a utility node
@@ -660,7 +593,7 @@ class Sticker:  # pylint: disable=too-many-instance-attributes
         )
 
         name = "{0}_addDirectionalOffset".format(sticker_prefix)
-        add_directional_offset = self.wrapper.create_utility_node(
+        add_directional_offset = self.parser.create_utility_node(
             "plusMinusAverage",
             node_name=name,
             asUtility=True,
@@ -697,7 +630,7 @@ class Sticker:  # pylint: disable=too-many-instance-attributes
         """Crea el subsistema translate_offset basado en el atributo offsetProjection"""
         name = "{0}_disableIfDetach".format(sticker_prefix)
 
-        disable_if_detach_node = self.wrapper.create_utility_node(
+        disable_if_detach_node = self.parser.create_utility_node(
             "condition",
             node_name=name,
             asUtility=True,
@@ -717,7 +650,7 @@ class Sticker:  # pylint: disable=too-many-instance-attributes
             attributes={"secondTerm": 1, "colorIfFalseR": 0},
         )
         name = "{0}_reverseOffset".format(sticker_prefix)
-        reverseOffset_node = self.wrapper.create_utility_node(
+        reverseOffset_node = self.parser.create_utility_node(
             "multiplyDivide",
             node_name=name,
             asUtility=True,
@@ -732,7 +665,7 @@ class Sticker:  # pylint: disable=too-many-instance-attributes
         )
 
         name = "{0}_layerOffset".format(sticker_prefix)
-        layerOffset_node = self.wrapper.create_utility_node(
+        layerOffset_node = self.parser.create_utility_node(
             "plusMinusAverage",
             node_name=name,
             asUtility=True,
@@ -745,7 +678,7 @@ class Sticker:  # pylint: disable=too-many-instance-attributes
             ],
             attributes={"input2D[1].input2Dx": 1},
         )
-        self.wrapper._create_utility_connections(
+        self.parser._create_utility_connections(
             [
                 {
                     "{0}.outColorB".format(
@@ -761,7 +694,7 @@ class Sticker:  # pylint: disable=too-many-instance-attributes
         for layer_definition in self.sticker_data[STICKER_SYSTEMS][
             SYSTEM_LAYERS
         ].values():
-            self.wrapper._create_utility_connections(
+            self.parser._create_utility_connections(
                 [
                     {
                         "{0}.output2Dx".format(
@@ -786,7 +719,7 @@ class Sticker:  # pylint: disable=too-many-instance-attributes
     ):
         """ """
         name = "{0}_addLookAtCameraOffset".format(sticker_prefix)
-        add_lookatcamera_offset_node = self.wrapper.create_utility_node(
+        add_lookatcamera_offset_node = self.parser.create_utility_node(
             "plusMinusAverage",
             node_name=name,
             asUtility=True,
@@ -801,7 +734,7 @@ class Sticker:  # pylint: disable=too-many-instance-attributes
         )
 
         name = "{0}_scaleIfLookAtCamera".format(sticker_prefix)
-        scale_if_lookatcamera_node = self.wrapper.create_utility_node(
+        scale_if_lookatcamera_node = self.parser.create_utility_node(
             "condition",
             node_name=name,
             asUtility=True,
@@ -825,7 +758,7 @@ class Sticker:  # pylint: disable=too-many-instance-attributes
             attributes={"secondTerm": 1},
         )
         name = "{0}_scaleInit".format(sticker_prefix)
-        scaleInit_node = self.wrapper.create_utility_node(
+        scaleInit_node = self.parser.create_utility_node(
             "multiplyDivide",
             node_name=name,
             asUtility=True,
@@ -847,7 +780,7 @@ class Sticker:  # pylint: disable=too-many-instance-attributes
         for layer_definition in self.sticker_data[STICKER_SYSTEMS][
             SYSTEM_LAYERS
         ].values():
-            self.wrapper._create_utility_connections(
+            self.parser._create_utility_connections(
                 [
                     {
                         "{0}.outColorB".format(
@@ -886,22 +819,24 @@ class Sticker:  # pylint: disable=too-many-instance-attributes
         """
         Creates file, projection & aiMatte nodes for each map declared in the sticker
         """
-        file_list = self.get_images_from_sticker_folder()
+        # TODO: Replace file_list with single image
+        # file_list = self.get_images_from_sticker_folder()
         matched_textures_dict = {}
         for texture_map in self.texture_maps:
-            name_match_pattern = "{0}_{1}".format(self.name, texture_map)
+            # name_match_pattern = "{0}_{1}".format(self.name, texture_map)
+            #
+            # matched_textures_dict[texture_map] = self.build_texture_maps_dict(
+            #     name_match_pattern, file_list
+            # )
+            #
+            # texture_map_file_path = os.path.join(
+            #     self.file_path, matched_textures_dict[texture_map][0]
+            # )
+            #
+            texture_map_file_path = self.file_path
+            frame_extension = re.search(r"\.([\d]*)\.", texture_map_file_path).group(1)
 
-            matched_textures_dict[texture_map] = self.build_texture_maps_dict(
-                name_match_pattern, file_list
-            )
-
-            texture_map_file_path = os.path.join(
-                self.file_path, matched_textures_dict[texture_map][0]
-            )
-
-            frame_extension = re.search(r"\.([\d]*)\.", texture_map_file_path).group(1)  # pyright: ignore[]
-
-            p2d, file_node = self.wrapper.create_file_node(
+            _p2d, file_node = self.parser.create_file_node(
                 self.maya_name,
                 layer_name,
                 texture_map,
@@ -909,10 +844,10 @@ class Sticker:  # pylint: disable=too-many-instance-attributes
                 frame_extension,
             )
 
-            projection_node = self.wrapper.create_projection_node(
+            projection_node = self.parser.create_projection_node(
                 self.maya_name, layer_name, texture_map, p3d, file_node
             )
-            matte_marerial = self.wrapper.create_aiMatte_material(
+            matte_marerial = self.parser.create_aiMatte_material(
                 self.maya_name, layer_name, texture_map, projection_node
             )
             ## Update sticker_data with the created nodes
@@ -924,70 +859,52 @@ class Sticker:  # pylint: disable=too-many-instance-attributes
                 {texture_map: matte_marerial}
             )
 
-        self.blend_color_mask(layer_name)
+        # self.blend_color_mask(layer_name)
 
-    def build_texture_maps_dict(self, name_match_pattern, file_list):
-        """Returns a list of files that match the name_match_pattern, if no files are found, raises a ValueError"""
-        file_list = [file for file in file_list if name_match_pattern in file]
-        if not file_list:
-            raise ValueError("No files found for {0}".format(name_match_pattern))
-        return file_list
+    # def build_texture_maps_dict(self, name_match_pattern, file_list):
+    #     """Returns a list of files that match the name_match_pattern, if no files are found, raises a ValueError"""
+    #     file_list = [file for file in file_list if name_match_pattern in file]
+    #     if not file_list:
+    #         raise ValueError("No files found for {0}".format(name_match_pattern))
+    #     return file_list
 
-    def blend_color_mask(self, layer_name):
-        """Blends the color and mask projections"""
-        try:
-            color_projection = (
-                self.sticker_data["projections"].get(layer_name, "base").get("color")
-            )
-            mask_projection = (
-                self.sticker_data["projections"].get(layer_name, "base").get("mask")
-            )
-        except:
-            raise ValueError(
-                "No color or mask projection found for {0}".format(layer_name)
-            )
-        blend_node_name = "{0}_{1}_blendColor".format(self.maya_name, layer_name)
-        blend_node = self.wrapper.create_utility_node(
-            "blendColors",
-            node_name=blend_node_name,
-            asUtility=True,
-            connections=[
-                {
-                    "{0}.outColor".format(color_projection.name()): "{0}.color1".format(
-                        blend_node_name
-                    )
-                },
-                {
-                    "{0}.outColorR".format(
-                        mask_projection.name()
-                    ): "{0}.blender".format(blend_node_name)
-                },
-            ],
-            attributes={
-                "color2": [1, 1, 1],
-            },
-        )
-        self.sticker_data["projections"][layer_name].update({"blendColor": blend_node})
-        return blend_node
-
-    def get_images_from_sticker_folder(self):
-        """Get all images from the folder"""
-        if self.file_path:
-            for root, dirs, files in os.walk(self.file_path):
-                return files
-        raise ValueError("No file path found")
-
-    def build_imagefile_dict(self):
-        """Builds a dictionary with the image files from the folder"""
-
-        file_list = self.get_images_from_sticker_folder()
-
-        file_dict = {}
-        for texture_map in self.texture_maps:
-            name_key = "{0}_{1}".format(self.name, texture_map)
-            file_dict[texture_map] = [file for file in file_list if name_key in file]
-
-        self.file_dict = file_dict
+    # def blend_color_mask(self, layer_name):
+    #     """Blends the color and mask projections"""
+    #     try:
+    #         color_projection = (
+    #             self.sticker_data["projections"].get(layer_name, "base").get("color")
+    #         )
+    #         mask_projection = (
+    #             self.sticker_data["projections"].get(layer_name, "base").get("mask")
+    #         )
+    #     except:
+    #         raise ValueError(
+    #             "No color or mask projection found for {0}".format(layer_name)
+    #         )
+    #     blend_node_name = "{0}_{1}_blendColor".format(self.maya_name, layer_name)
+    #     blend_node = self.parser.create_utility_node(
+    #         "blendColors",
+    #         node_name=blend_node_name,
+    #         asUtility=True,
+    #         connections=[
+    #             {
+    #                 "{0}.outColor".format(color_projection.name()): "{0}.color1".format(
+    #                     blend_node_name
+    #                 )
+    #             },
+    #             {
+    #                 "{0}.outColorR".format(
+    #                     mask_projection.name()
+    #                 ): "{0}.blender".format(blend_node_name)
+    #             },
+    #         ],
+    #         attributes={
+    #             "color2": [1, 1, 1],
+    #         },
+    #     )
+    #     self.sticker_data["projections"][layer_name].update({"blendColor": blend_node})
+    #     return blend_node
+    #
 
     def apply_materials(self):
         """Applies materials to the layers
@@ -996,8 +913,8 @@ class Sticker:  # pylint: disable=too-many-instance-attributes
         """
         pprint(self.sticker_data["projections"])
         sticker_blend_projection = (
-            self.sticker_data.get("projections").get("base").get("blendColor")
+            self.sticker_data.get("projections").get("base").get("color")
         )
-        new_material = self.wrapper.create_sticker_viewport_material(
+        new_material = self.parser.create_sticker_viewport_material(
             self.maya_name, sticker_blend_projection, self.geo_mesh
         )
