@@ -43,8 +43,6 @@ class Sticker:  # pylint: disable=too-many-instance-attributes
         self.layers = layers if layers else []
         self.texture_maps = maps if maps else []
         self.geometry = geometry if geometry else []
-        print(geometry)
-        print(self.geometry)
         self.geo_mesh = self.geometry.split(".")[0]
         self.root_name = "{name}_{description}_{flag}{index}".format(
             description="sticker", name=name, flag=flag, index=index
@@ -862,61 +860,6 @@ class Sticker:  # pylint: disable=too-many-instance-attributes
                 {texture_map: matte_marerial}
             )
 
-        # self.blend_color_mask(layer_name)
-
-    # def build_texture_maps_dict(self, name_match_pattern, file_list):
-    #     """Returns a list of files that match the name_match_pattern, if no files are found, raises a ValueError"""
-    #     file_list = [file for file in file_list if name_match_pattern in file]
-    #     if not file_list:
-    #         raise ValueError("No files found for {0}".format(name_match_pattern))
-    #     return file_list
-
-    # def blend_color_mask(self, layer_name):
-    #     """Blends the color and mask projections"""
-    #     try:
-    #         color_projection = (
-    #             self.sticker_data["projections"].get(layer_name, "base").get("color")
-    #         )
-    #         mask_projection = (
-    #             self.sticker_data["projections"].get(layer_name, "base").get("mask")
-    #         )
-    #     except:
-    #         raise ValueError(
-    #             "No color or mask projection found for {0}".format(layer_name)
-    #         )
-    #     blend_node_name = "{0}_{1}_blendColor".format(self.maya_name, layer_name)
-    #     blend_node = self.parser.create_utility_node(
-    #         "blendColors",
-    #         node_name=blend_node_name,
-    #         asUtility=True,
-    #         connections=[
-    #             {
-    #                 "{0}.outColor".format(color_projection.name()): "{0}.color1".format(
-    #                     blend_node_name
-    #                 )
-    #             },
-    #             {
-    #                 "{0}.outColorR".format(
-    #                     mask_projection.name()
-    #                 ): "{0}.blender".format(blend_node_name)
-    #             },
-    #         ],
-    #         attributes={
-    #             "color2": [1, 1, 1],
-    #         },
-    #     )
-    #     self.sticker_data["projections"][layer_name].update({"blendColor": blend_node})
-    #     return blend_node
-    #
-
-    def apply_materials(self):
-        """Applies materials to the layers
-
-        TODO: flow check if a material is already created, skip or connect to it
-        """
-        pprint(self.sticker_data["projections"])
-        sticker_blend_projection = (
-            self.sticker_data.get("projections").get("base").get("color")
     def apply_to_material(self, layer="base", map="color"):
         """Applies materials to the layers"""
         # TODO: flow check if a material is already created, skip or connect to it
