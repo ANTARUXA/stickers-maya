@@ -379,7 +379,7 @@ class Parser:
         self.set_attribute(joint, "drawStyle", 2)
         return joint
 
-    def create_file_node(self, sticker_name, layer_name, texture_map, file_path,frame_extension):
+    def create_file_node(self, sticker_name, layer_name, texture_map, file_path, frame_extension,activate_fe=0):
         # Connect a place2dtexture node to the file node
         place2dTexture = self.create_utility_node(
             "place2dTexture", node_name = sticker_name + "_" + layer_name + "_" + texture_map +
@@ -412,11 +412,12 @@ class Parser:
                                                  {"{0}.wrapV".format(place2dTexture):"{0}.wrapV".format(file_node_name)}
                                                  ],
                                              attributes={
-                                                         'useFrameExtension':1,
+                                                         'useFrameExtension':activate_fe,
                                                          })
         if os.path.isfile(file_path):
             file_node.setAttr('ftn', file_path)
-        file_node.setAttr('frameExtension', int(frame_extension))
+        if frame_extension:
+            file_node.setAttr('frameExtension', int(frame_extension))
 
         return place2dTexture, file_node
 
@@ -461,21 +462,83 @@ class Parser:
         '''
         Create a viewport material for the sticker
         '''
-        sticker_vp_material_name = "_".join([sticker_name, "viewport_shd"])
+        sticker_vp_material_name = "_".join([mesh, "viewport_shd"])
+        layer_texture_name = "_".join([mesh,"sticker_layertxt"])
         if self.cmds.objExists(sticker_vp_material_name):
             return self.pm.PyNode(sticker_vp_material_name)
+        vp_layer_texture = self.create_utility_node('layeredTexture',
+                                                    node_name = layer_texture_name,
+                                                    asShader=True,
+                                                   )
         vp_material = self.create_utility_node("lambert",
                                                node_name = sticker_vp_material_name,
                                                asShader=True,
                                                connections = [
-                                                   {"{0}.outColor".format(last_projection):"{0}.color".format(sticker_vp_material_name)},
+                                                   {"{0}.outColor".format(layer_texture_name):"{0}.color".format(sticker_vp_material_name)},
                                                    ],
                                                )
         self.cmds.sets(name='{0}_SG'.format(sticker_vp_material_name), empty=True, renderable=True,
                     noSurfaceShader=True)
+
+
 
         self.cmds.connectAttr('{0}.outColor'.format(sticker_vp_material_name),
                             '{0}.surfaceShader'.format(sticker_vp_material_name + "_SG"))
 
         self.cmds.sets(mesh, e=True, forceElement=sticker_vp_material_name + "_SG")
         return vp_material
+
+
+    def geo_has_stickers(self, geo_mesh) -> bool:
+        """Detects if gemoetry is already attached to a sticker
+        Checks for the string '_POP_' in any (and all) conection name, returns true if found.
+
+        Args:
+            geo_mesh (str): geometry name
+
+        Returns:
+            (bool): presence of a sticker connected to mesh
+        """
+        mesh_connections = []
+        for shape in self.cmds.listRelatives(geo_mesh):
+            mesh_connections.extend(self.cmds.listConnections(shape))
+        is_present = False
+        print(mesh_connections)
+        if isinstance(mesh_connections,list):
+            is_present = bool([s for s in mesh_connections if s.find('_POPConstraint')!=-1])
+        return is_present
+
+    def get_sticker_layertxt(self,geo_mesh) -> str:
+        """
+
+        Args:
+            geo_mesh ():
+
+        Returns:
+
+        """
+        return f"{geo_mesh}_sticker_layertxt"
+
+    def get_last_free_plug(self, sticker_layertxt) -> int:
+        """
+
+        Args:
+            sticker_layertxt ():
+
+        Returns:
+
+        """
+        idx=0
+        while True:
+            connection_info = self.cmds.connectionInfo(sticker_layertxt + ".inputs[{i}].color".format(i=idx),
+                                                  isDestination=True)
+            if not connection_info:
+                break
+            idx +=1
+        return idx
+
+    def insert_new_sticker_to_material(self, geo_mesh, new_sticker_projection) -> None:
+        geo_sticker_layertxt = self.get_sticker_layertxt(geo_mesh)
+        first_free_idx = self.get_last_free_plug(geo_sticker_layertxt)
+        self.cmds.connectAttr('{0}.outColor'.format(new_sticker_projection),
+                            '{0}.inputs[{1}].color'.format(geo_sticker_layertxt,first_free_idx))

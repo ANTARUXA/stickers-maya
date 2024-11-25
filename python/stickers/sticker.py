@@ -105,7 +105,7 @@ class Sticker:  # pylint: disable=too-many-instance-attributes
         self.create_offset_projection_subsystems()
         # self.build_imagefile_dict()
         self.create_layer_shading_nodes()
-        self.apply_materials()
+        self.apply_to_material()
 
     def create_sticker_top_groups(self):
         """Crea los grupos principales del sticker
@@ -815,7 +815,7 @@ class Sticker:  # pylint: disable=too-many-instance-attributes
             # Call create_shading_nodes function to create shading nodes for each layer
             self.create_maps_shading_nodes(layer_name, p3d)
 
-    def create_maps_shading_nodes(self, layer_name, p3d):
+    def create_maps_shading_nodes(self, layer_name, p3d,img_sequence=False):
         """
         Creates file, projection & aiMatte nodes for each map declared in the sticker
         """
@@ -834,7 +834,9 @@ class Sticker:  # pylint: disable=too-many-instance-attributes
             # )
             #
             texture_map_file_path = self.file_path
-            frame_extension = re.search(r"\.([\d]*)\.", texture_map_file_path).group(1)
+            frame_extension=False
+            if img_sequence:
+                frame_extension = re.search(r"\.([\d]*)\.", texture_map_file_path).group(1)
 
             _p2d, file_node = self.parser.create_file_node(
                 self.maya_name,
@@ -843,6 +845,7 @@ class Sticker:  # pylint: disable=too-many-instance-attributes
                 texture_map_file_path,
                 frame_extension,
             )
+
 
             projection_node = self.parser.create_projection_node(
                 self.maya_name, layer_name, texture_map, p3d, file_node
@@ -914,7 +917,17 @@ class Sticker:  # pylint: disable=too-many-instance-attributes
         pprint(self.sticker_data["projections"])
         sticker_blend_projection = (
             self.sticker_data.get("projections").get("base").get("color")
+    def apply_to_material(self, layer="base", map="color"):
+        """Applies materials to the layers"""
+        # TODO: flow check if a material is already created, skip or connect to it
+
+        # check if layer_texture is created and insert new layer with sticker
+        sticker_projection = (
+            self.sticker_data.get("projections").get(layer).get(map)
         )
         new_material = self.parser.create_sticker_viewport_material(
-            self.maya_name, sticker_blend_projection, self.geo_mesh
+            self.maya_name, sticker_projection, self.geo_mesh
         )
+
+        if self.parser.geo_has_stickers(self.geo_mesh):
+            self.parser.insert_new_sticker_to_material(self.geo_mesh,sticker_projection)
