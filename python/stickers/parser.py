@@ -6,20 +6,23 @@
 # Written by:
 # Andrés Méndez del Río <andres.mendez@antaruxa.com>, 2023
 # Cristina Fernandez Gomez <cristina.fernandez@antaruxa.com>, 2023
+# pylint: disable=[too-many-public-methods,consider-using-f-string]
 
 import importlib
 import os
 
 
 class Parser:
-    """Custom wrappers of common functions and utilities using globals in order to avoid hardcoding maya commands"""
+    """Custom wrappers of common functions and utilities using
+    globals in order to avoid hardcoding maya commands
+    """
 
     def __init__(self):
         try:
             self.cmds = importlib.import_module("maya.cmds")
             self.pm = importlib.import_module("pymel.core")
-        except:
-            pass
+        except ModuleNotFoundError as e:
+            print("## IGNORE: Module Import Error, {e}".format(e=e))
 
     def hierarchy_parent(self, hierarchy_list, master_node):
         """Parents a list of nodes in reverse order.
@@ -40,9 +43,6 @@ class Parser:
                 self.parent_nodes(grp, master_node)
                 return
             self.parent_nodes(grp, reverse_hierarchy_list[idx + 1])
-
-    # def __repr__(self):
-    #     return dict(self.__class__)
 
     def update_name(self, chain, new_chain_part):
         """Updates the descriptor part of the node name with the parameter given
@@ -115,20 +115,21 @@ class Parser:
         return cns
 
     def create_control_shape(
-        self, ctl_transform, shape_type="circle", normal=[0, 0, 1], **kwargs
+        self, ctl_transform, shape_type="circle", normal=(0, 0, 1), **kwargs
     ):
         """
-        Create simple circle shape (by default) oriented to x. And makes it the shape of the ctl_transform
+        Create simple circle shape (by default) oriented to x.
+        Makes it the shape of the ctl_transform
         """
         shape = {"circle": "circle", "square": "nurbSquare"}
         func = getattr(self.pm, shape[shape_type])
         # Check if ctl_transform has any children (shapes)
-        _ctl_shape = self.exec_func(
+        ctl_shape = self.exec_func(
             func, name="_temp_{0}".format(ctl_transform.name()), normal=normal, **kwargs
         )[0]
-        self.parent_shape(ctl_transform, _ctl_shape.getShape())
-        print("parented shape to {0}".format(ctl_transform))
-        self.pm.delete(_ctl_shape)
+        self.parent_shape(ctl_transform, ctl_shape.getShape())
+        self.pm.delete(ctl_shape)
+        return ctl_shape
 
     def parent_shape(self, transform, shape):
         """Parents a given shape to the specified transform"""
@@ -274,8 +275,10 @@ class Parser:
 
         Args:
             node (string): Node's name that will get the attribute
-            keyable (bool, optional): If the attribute will be keyable. Defaults to True.
-            channelBox (bool, optional): If the attribute will be visible in the channelBox. Defaults to False.
+            keyable (bool, optional): If the attribute will be keyable.
+                                      Defaults to True.
+            channelBox (bool, optional): If the attribute will be visible in the channelBox.
+                                         Default = False.
 
         Returns:
             dict: Dictionary {Attribute's longName : Attribute path}
@@ -305,7 +308,7 @@ class Parser:
         """
         getattr(node, attribute).set(value)
 
-    def create_3d_texture(self, node, translate=None, scale=None, *args, **kwargs):
+    def create_3d_texture(self, node, *args, translate=None, scale=None, **kwargs):
         """Creates a place 3d Texture node, and changes its transform
 
         Args:
@@ -325,21 +328,13 @@ class Parser:
         return node
 
     def create_utility_node(
-        self,
-        node_type,
-        node_name,
-        connections=None,
-        attributes=None,
-        *args,
-        **kwargs
+        self, node_type, node_name, *args, connections=None, attributes=None, **kwargs
     ):
         """Creates any type of utility node in the node editor"""
         if self.cmds.objExists(node_name):
             return self.pm.PyNode(node_name)
         func = getattr(self.pm, "shadingNode")
-        _node = self.exec_func(
-            func, node_type, name=node_name, *args, **kwargs
-        )
+        _node = self.exec_func(func, node_type, name=node_name, *args, **kwargs)
 
         if connections:
             self._create_utility_connections(connections)
@@ -347,19 +342,21 @@ class Parser:
         if attributes:
             self._set_utility_values(node_name, attributes)
         return _node
+
     def _set_utility_values(self, node, attr_dict):
         for attr, value in attr_dict.items():
             try:
                 self.cmds.setAttr("{0}.{1}".format(node, attr), value)
             except:
                 self.pm.PyNode("{0}.{1}".format(node, attr)).set(value)
+
     def _create_utility_connections(self, connection_list, **kwargs):
         """Creates connections between node_editor's utility nodes"""
         for pair in connection_list:
             for orig_plug, dest_plug in pair.items():
-                self.cmds.connectAttr(orig_plug, dest_plug)
+                self.cmds.connectAttr(orig_plug, dest_plug, **kwargs)
 
-    def create_joint(self, nodes, parent="", *args, **kwargs):
+    def create_joint(self, nodes, *args, parent="", **kwargs):
         """Creates a joint, hides the drawStyle, and parents to any node if requested
 
         Args:
@@ -379,115 +376,244 @@ class Parser:
         self.set_attribute(joint, "drawStyle", 2)
         return joint
 
-    def create_file_node(self, sticker_name, layer_name, texture_map, file_path, frame_extension,activate_fe=0):
+    def create_file_node(
+        self,
+        sticker_name,
+        layer_name,
+        texture_map,
+        file_path,
+        frame_extension,
+        activate_fe=0,
+    ):
         # Connect a place2dtexture node to the file node
         place2dTexture = self.create_utility_node(
-            "place2dTexture", node_name = sticker_name + "_" + layer_name + "_" + texture_map +
-            "_place2dTexture", asUtility=True,
-            attributes={"wrapU": 0, "wrapV": 0}
+            "place2dTexture",
+            node_name=sticker_name
+            + "_"
+            + layer_name
+            + "_"
+            + texture_map
+            + "_place2dTexture",
+            asUtility=True,
+            attributes={"wrapU": 0, "wrapV": 0},
         )
         file_node_name = "_".join([sticker_name, layer_name, texture_map])
 
-        file_node = self.create_utility_node("file",
-                                             node_name = file_node_name,
-                                            asUtility=True,
-                                             connections = [
-                                                 {"{0}.outUV".format(place2dTexture):"{0}.uvCoord".format(file_node_name)},
-                                                 {"{0}.outUvFilterSize".format(place2dTexture):"{0}.uvFilterSize".format(file_node_name)},
-                                                 {"{0}.vertexCameraOne".format(place2dTexture):"{0}.vertexCameraOne".format(file_node_name)},
-                                                 {"{0}.vertexUvOne".format(place2dTexture):"{0}.vertexUvOne".format(file_node_name)},
-                                                 {"{0}.vertexUvThree".format(place2dTexture):"{0}.vertexUvThree".format(file_node_name)},
-                                                 {"{0}.vertexUvTwo".format(place2dTexture):"{0}.vertexUvTwo".format(file_node_name)},
-                                                 {"{0}.coverage".format(place2dTexture):"{0}.coverage".format(file_node_name)},
-                                                 {"{0}.mirrorU".format(place2dTexture):"{0}.mirrorU".format(file_node_name)},
-                                                 {"{0}.mirrorV".format(place2dTexture):"{0}.mirrorV".format(file_node_name)},
-                                                 {"{0}.noiseUV".format(place2dTexture):"{0}.noiseUV".format(file_node_name)},
-                                                 {"{0}.offset".format(place2dTexture):"{0}.offset".format(file_node_name)},
-                                                 {"{0}.repeatUV".format(place2dTexture):"{0}.repeatUV".format(file_node_name)},
-                                                 {"{0}.rotateFrame".format(place2dTexture):"{0}.rotateFrame".format(file_node_name)},
-                                                 {"{0}.rotateUV".format(place2dTexture):"{0}.rotateUV".format(file_node_name)},
-                                                 {"{0}.stagger".format(place2dTexture):"{0}.stagger".format(file_node_name)},
-                                                 {"{0}.translateFrame".format(place2dTexture):"{0}.translateFrame".format(file_node_name)},
-                                                 {"{0}.wrapU".format(place2dTexture):"{0}.wrapU".format(file_node_name)},
-                                                 {"{0}.wrapV".format(place2dTexture):"{0}.wrapV".format(file_node_name)}
-                                                 ],
-                                             attributes={
-                                                         'useFrameExtension':activate_fe,
-                                                         })
+        file_node = self.create_utility_node(
+            "file",
+            node_name=file_node_name,
+            asUtility=True,
+            connections=[
+                {
+                    "{0}.outUV".format(place2dTexture): "{0}.uvCoord".format(
+                        file_node_name
+                    )
+                },
+                {
+                    "{0}.outUvFilterSize".format(
+                        place2dTexture
+                    ): "{0}.uvFilterSize".format(file_node_name)
+                },
+                {
+                    "{0}.vertexCameraOne".format(
+                        place2dTexture
+                    ): "{0}.vertexCameraOne".format(file_node_name)
+                },
+                {
+                    "{0}.vertexUvOne".format(place2dTexture): "{0}.vertexUvOne".format(
+                        file_node_name
+                    )
+                },
+                {
+                    "{0}.vertexUvThree".format(
+                        place2dTexture
+                    ): "{0}.vertexUvThree".format(file_node_name)
+                },
+                {
+                    "{0}.vertexUvTwo".format(place2dTexture): "{0}.vertexUvTwo".format(
+                        file_node_name
+                    )
+                },
+                {
+                    "{0}.coverage".format(place2dTexture): "{0}.coverage".format(
+                        file_node_name
+                    )
+                },
+                {
+                    "{0}.mirrorU".format(place2dTexture): "{0}.mirrorU".format(
+                        file_node_name
+                    )
+                },
+                {
+                    "{0}.mirrorV".format(place2dTexture): "{0}.mirrorV".format(
+                        file_node_name
+                    )
+                },
+                {
+                    "{0}.noiseUV".format(place2dTexture): "{0}.noiseUV".format(
+                        file_node_name
+                    )
+                },
+                {
+                    "{0}.offset".format(place2dTexture): "{0}.offset".format(
+                        file_node_name
+                    )
+                },
+                {
+                    "{0}.repeatUV".format(place2dTexture): "{0}.repeatUV".format(
+                        file_node_name
+                    )
+                },
+                {
+                    "{0}.rotateFrame".format(place2dTexture): "{0}.rotateFrame".format(
+                        file_node_name
+                    )
+                },
+                {
+                    "{0}.rotateUV".format(place2dTexture): "{0}.rotateUV".format(
+                        file_node_name
+                    )
+                },
+                {
+                    "{0}.stagger".format(place2dTexture): "{0}.stagger".format(
+                        file_node_name
+                    )
+                },
+                {
+                    "{0}.translateFrame".format(
+                        place2dTexture
+                    ): "{0}.translateFrame".format(file_node_name)
+                },
+                {
+                    "{0}.wrapU".format(place2dTexture): "{0}.wrapU".format(
+                        file_node_name
+                    )
+                },
+                {
+                    "{0}.wrapV".format(place2dTexture): "{0}.wrapV".format(
+                        file_node_name
+                    )
+                },
+            ],
+            attributes={
+                "useFrameExtension": activate_fe,
+            },
+        )
         if os.path.isfile(file_path):
-            file_node.setAttr('ftn', file_path)
+            file_node.setAttr("ftn", file_path)
         if frame_extension:
-            file_node.setAttr('frameExtension', int(frame_extension))
+            file_node.setAttr("frameExtension", int(frame_extension))
 
         return place2dTexture, file_node
 
-    def create_projection_node(self, sticker_name, layer_name, texture_map, p3d, file_node):
+    def create_projection_node(
+        self, sticker_name, layer_name, texture_map, p3d, file_node
+    ):
         # Create a projection node
-        projection_node_name = "_".join([sticker_name, layer_name, texture_map, "projection"])
+        projection_node_name = "_".join(
+            [sticker_name, layer_name, texture_map, "projection"]
+        )
 
-        projection_node = self.create_utility_node("projection",
-                                                   node_name = projection_node_name,
-                                                   asUtility=True,
-                                                   connections = [
-                                                       {"{0}.outColor".format(file_node):"{0}.image".format(projection_node_name)}, {"{0}.worldInverseMatrix".format(p3d):"{0}.placementMatrix".format(projection_node_name)},
-                                                       ],
-                                                   attributes=
-                                                   {
-                                                       "wrap": 0,
-                                                       'defaultColorR':0,
-                                                       'defaultColorG':0,
-                                                       'defaultColorB':0,
-                                                       }
-
-                                                   )
+        projection_node = self.create_utility_node(
+            "projection",
+            node_name=projection_node_name,
+            asUtility=True,
+            connections=[
+                {
+                    "{0}.outColor".format(file_node): "{0}.image".format(
+                        projection_node_name
+                    )
+                },
+                {
+                    "{0}.outTransparency".format(file_node): "{0}.transparency".format(
+                        projection_node_name
+                    )
+                },
+                {
+                    "{0}.worldInverseMatrix".format(p3d): "{0}.placementMatrix".format(
+                        projection_node_name
+                    )
+                },
+            ],
+            attributes={
+                "wrap": 0,
+                "defaultColorR": 0,
+                "defaultColorG": 0,
+                "defaultColorB": 0,
+            },
+        )
         return projection_node
 
-    def create_aiMatte_material(self, sticker_name, layer_name, texture_map, projection):
+    def create_aiMatte_material(
+        self, sticker_name, layer_name, texture_map, projection
+    ):
         # Create an aiMatte material
-        aiMatte_material_name = "_".join([sticker_name, layer_name, texture_map, "bake_shd"])
-        aiMatte_material = self.create_utility_node("aiMatte",
-                                                    asShader=True,
-                                                    node_name = aiMatte_material_name,
-                                                    connections = [
-                                                        {"{0}.outColor".format(projection):"{0}.color".format(aiMatte_material_name)},
-                                                        ]
-                                                    )
-        self.cmds.sets(name='{0}_SG'.format(aiMatte_material_name), empty=True, renderable=True,
-                    noSurfaceShader=True)
-        self.cmds.connectAttr('{0}.outColor'.format(aiMatte_material_name),
-                            '{0}.surfaceShader'.format(aiMatte_material_name + "_SG"))
+        aiMatte_material_name = "_".join(
+            [sticker_name, layer_name, texture_map, "bake_shd"]
+        )
+        aiMatte_material = self.create_utility_node(
+            "aiMatte",
+            asShader=True,
+            node_name=aiMatte_material_name,
+            connections=[
+                {
+                    "{0}.outColor".format(projection): "{0}.color".format(
+                        aiMatte_material_name
+                    )
+                },
+            ],
+        )
+        self.cmds.sets(
+            name="{0}_SG".format(aiMatte_material_name),
+            empty=True,
+            renderable=True,
+            noSurfaceShader=True,
+        )
+        self.cmds.connectAttr(
+            "{0}.outColor".format(aiMatte_material_name),
+            "{0}.surfaceShader".format(aiMatte_material_name + "_SG"),
+        )
         return aiMatte_material
 
     def create_sticker_viewport_material(self, sticker_name, last_projection, mesh):
-        '''
+        """
         Create a viewport material for the sticker
-        '''
+        """
         sticker_vp_material_name = "_".join([mesh, "viewport_shd"])
-        layer_texture_name = "_".join([mesh,"sticker_layertxt"])
+        layer_texture_name = "_".join([mesh, "sticker_layertxt"])
         if self.cmds.objExists(sticker_vp_material_name):
             return self.pm.PyNode(sticker_vp_material_name)
-        vp_layer_texture = self.create_utility_node('layeredTexture',
-                                                    node_name = layer_texture_name,
-                                                    asShader=True,
-                                                   )
-        vp_material = self.create_utility_node("lambert",
-                                               node_name = sticker_vp_material_name,
-                                               asShader=True,
-                                               connections = [
-                                                   {"{0}.outColor".format(layer_texture_name):"{0}.color".format(sticker_vp_material_name)},
-                                                   ],
-                                               )
-        self.cmds.sets(name='{0}_SG'.format(sticker_vp_material_name), empty=True, renderable=True,
-                    noSurfaceShader=True)
+        vp_layer_texture = self.create_utility_node(
+            "layeredTexture",
+            node_name=layer_texture_name,
+            asShader=True,
+        )
+        vp_material = self.create_utility_node(
+            "lambert",
+            node_name=sticker_vp_material_name,
+            asShader=True,
+            connections=[
+                {
+                    "{0}.outColor".format(layer_texture_name): "{0}.color".format(
+                        sticker_vp_material_name
+                    )
+                },
+            ],
+        )
+        self.cmds.sets(
+            name="{0}_SG".format(sticker_vp_material_name),
+            empty=True,
+            renderable=True,
+            noSurfaceShader=True,
+        )
 
-
-
-        self.cmds.connectAttr('{0}.outColor'.format(sticker_vp_material_name),
-                            '{0}.surfaceShader'.format(sticker_vp_material_name + "_SG"))
+        self.cmds.connectAttr(
+            "{0}.outColor".format(sticker_vp_material_name),
+            "{0}.surfaceShader".format(sticker_vp_material_name + "_SG"),
+        )
 
         self.cmds.sets(mesh, e=True, forceElement=sticker_vp_material_name + "_SG")
         return vp_material
-
 
     def geo_has_stickers(self, geo_mesh) -> bool:
         """Detects if gemoetry is already attached to a sticker
@@ -504,11 +630,13 @@ class Parser:
             mesh_connections.extend(self.cmds.listConnections(shape))
         is_present = False
         print(mesh_connections)
-        if isinstance(mesh_connections,list):
-            is_present = bool([s for s in mesh_connections if s.find('_POPConstraint')!=-1])
+        if isinstance(mesh_connections, list):
+            is_present = bool(
+                [s for s in mesh_connections if s.find("_POPConstraint") != -1]
+            )
         return is_present
 
-    def get_sticker_layertxt(self,geo_mesh) -> str:
+    def get_sticker_layertxt(self, geo_mesh) -> str:
         """
 
         Args:
@@ -528,17 +656,31 @@ class Parser:
         Returns:
 
         """
-        idx=0
+        idx = 0
         while True:
-            connection_info = self.cmds.connectionInfo(sticker_layertxt + ".inputs[{i}].color".format(i=idx),
-                                                  isDestination=True)
+            connection_info = self.cmds.connectionInfo(
+                sticker_layertxt + ".inputs[{i}].color".format(i=idx),
+                isDestination=True,
+            )
             if not connection_info:
                 break
-            idx +=1
+            idx += 1
         return idx
 
     def insert_new_sticker_to_material(self, geo_mesh, new_sticker_projection) -> None:
+        """
+
+        Args:
+            geo_mesh ():
+            new_sticker_projection ():
+        """
         geo_sticker_layertxt = self.get_sticker_layertxt(geo_mesh)
         first_free_idx = self.get_last_free_plug(geo_sticker_layertxt)
-        self.cmds.connectAttr('{0}.outColor'.format(new_sticker_projection),
-                            '{0}.inputs[{1}].color'.format(geo_sticker_layertxt,first_free_idx))
+        self.cmds.connectAttr(
+            "{0}.outColor".format(new_sticker_projection),
+            "{0}.inputs[{1}].color".format(geo_sticker_layertxt, first_free_idx),
+        )
+        self.cmds.connectAttr(
+            "{0}.outAlpha".format(new_sticker_projection),
+            "{0}.inputs[{1}].alpha".format(geo_sticker_layertxt, first_free_idx),
+        )

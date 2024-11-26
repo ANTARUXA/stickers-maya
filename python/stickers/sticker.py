@@ -6,13 +6,11 @@
 # Written by:
 # Andrés Méndez del Río <andres.mendez@antaruxa.com>, 2023
 # Cristina Fernandez Gomez <cristina.fernandez@antaruxa.com>, 2023
-
-import os
+# pylint: disable=[consider-using-f-string]
 import re
-from pprint import pprint
 
 from . import parser
-from .vars import *  # pylint: disable=unused-wildcard-import
+from .vars import *  # pylint: disable=[ unused-wildcard-import, wildcard-import]
 
 
 class Sticker:  # pylint: disable=too-many-instance-attributes
@@ -22,33 +20,17 @@ class Sticker:  # pylint: disable=too-many-instance-attributes
     Posee todos los metodos para su creacion y manejo de datos.
     """
 
-    def __init__(
-        self,
-        name,
-        flag="X",
-        index=0,
-        layers=None,
-        geometry=None,
-        maps=None,
-        file_path=None,
-        _char_name="Argonte",
-    ):
+    def __init__( self, name, layers=None, geometry=None, maps=None, file_path=None):
         self.parser = parser.Parser()
+        self.file_path = file_path
         self.name = name
-        self.maya_name = "{name}_{flag}{index}".format(
-            name=name, flag=flag, index=index
-        )
-        self.flag = flag
-        self.index = index
         self.layers = layers if layers else []
         self.texture_maps = maps if maps else []
-        self.geometry = geometry if geometry else []
+        self.geometry = geometry if geometry else ""
         self.geo_mesh = self.geometry.split(".")[0]
-        self.root_name = "{name}_{description}_{flag}{index}".format(
-            description="sticker", name=name, flag=flag, index=index
-        )
+        self.root_name = "{name}_{description}".format(
+            description="sticker", name=name)
 
-        self.file_path = file_path
         self.sticker_data = {
             "self": self,
             CONTROLS: {STICKER_CONTROLS: [], LAYER_CONTROLS: []},
@@ -217,7 +199,7 @@ class Sticker:  # pylint: disable=too-many-instance-attributes
         for attr_definition in INNIT_ATTR[STICKER_ATTRIBUTES]:
             # Runs the parser and returns the created attribute
             created_attr = self.parser.create_attribute(main_control, **attr_definition)
-            # Updates sticker data attributes dictionary with the created attribute (longName:attributePath)
+            # Updates sticker data attributes dictionary with the created attribute
             self.sticker_data[ATTRIBUTES][STICKER_ATTRIBUTES].update(created_attr)
 
         # Runs loop for each layer to create.
@@ -242,12 +224,13 @@ class Sticker:  # pylint: disable=too-many-instance-attributes
                 created_attr = self.parser.create_attribute(
                     main_control, **attr_definition
                 )
-                # Updates sticker data attributes dictionary with the created attribute (longName:attributePath)
+                # Updates sticker data attributes dictionary with the created attribute
                 self.sticker_data[ATTRIBUTES][LAYER_ATTRIBUTES].update(created_attr)
 
     def create_constraints(self):
-        """Master function used to create all the constraints necessary to make the system function correctly.
-        It calls every other helper function to create specific constraints, each with its own parameters.
+        """Master function used to create all the constraints necessary
+        to make the system function correctly. It calls every other helper function
+        to create specific constraints, each with its own parameters.
         """
         geo_setup_cns = self.create_cns_geo_setup()
         main_control_cns = self.createo_cns_main_control()
@@ -541,15 +524,15 @@ class Sticker:  # pylint: disable=too-many-instance-attributes
     def create_sticker_controls(self):
         """Creates control shapes for both surface and main control transforms."""
         surface_ctl = self.sticker_data[CONTROLS][STICKER_CONTROLS][0]
-        surface_shp = self.parser.create_control_shape(surface_ctl, radius=1.5)
+        _surface_shp = self.parser.create_control_shape(surface_ctl, radius=1.5)
         main_ctl = self.sticker_data[CONTROLS][STICKER_CONTROLS][1]
-        main_shp = self.parser.create_control_shape(main_ctl, radius=1.2)
+        _main_shp = self.parser.create_control_shape(main_ctl, radius=1.2)
 
     def create_layer_controls(self):
         """Creates control shapes for all layers created."""
         radius = 1
         for layer in self.sticker_data[CONTROLS][LAYER_CONTROLS]:
-            layer_shp = self.parser.create_control_shape(layer, radius=radius)
+            _layer_shp = self.parser.create_control_shape(layer, radius=radius)
             radius -= 0.15
 
     def create_offset_projection_subsystems(self):
@@ -562,7 +545,7 @@ class Sticker:  # pylint: disable=too-many-instance-attributes
         """
         mainControl_attr_ref = self.sticker_data[ATTRIBUTES][STICKER_ATTRIBUTES]
         # Sticer identifier prefix avoiding duplicate names
-        sticker_prefix = "{0}_{1}".format(self.maya_name, "offsetProjection")
+        sticker_prefix = "{0}_{1}".format(self.name, "offsetProjection")
 
         # New utility node name
         name = "{0}_oneMinusX_halfY".format(sticker_prefix)
@@ -819,7 +802,7 @@ class Sticker:  # pylint: disable=too-many-instance-attributes
         """
         # TODO: Replace file_list with single image
         # file_list = self.get_images_from_sticker_folder()
-        matched_textures_dict = {}
+        # matched_textures_dict = {}
         for texture_map in self.texture_maps:
             # name_match_pattern = "{0}_{1}".format(self.name, texture_map)
             #
@@ -837,7 +820,7 @@ class Sticker:  # pylint: disable=too-many-instance-attributes
                 frame_extension = re.search(r"\.([\d]*)\.", texture_map_file_path).group(1)
 
             _p2d, file_node = self.parser.create_file_node(
-                self.maya_name,
+                self.name,
                 layer_name,
                 texture_map,
                 texture_map_file_path,
@@ -846,10 +829,10 @@ class Sticker:  # pylint: disable=too-many-instance-attributes
 
 
             projection_node = self.parser.create_projection_node(
-                self.maya_name, layer_name, texture_map, p3d, file_node
+                self.name, layer_name, texture_map, p3d, file_node
             )
             matte_marerial = self.parser.create_aiMatte_material(
-                self.maya_name, layer_name, texture_map, projection_node
+                self.name, layer_name, texture_map, projection_node
             )
             ## Update sticker_data with the created nodes
 
@@ -862,14 +845,11 @@ class Sticker:  # pylint: disable=too-many-instance-attributes
 
     def apply_to_material(self, layer="base", map="color"):
         """Applies materials to the layers"""
-        # TODO: flow check if a material is already created, skip or connect to it
-
-        # check if layer_texture is created and insert new layer with sticker
         sticker_projection = (
             self.sticker_data.get("projections").get(layer).get(map)
         )
         new_material = self.parser.create_sticker_viewport_material(
-            self.maya_name, sticker_projection, self.geo_mesh
+            self.name, sticker_projection, self.geo_mesh
         )
 
         if self.parser.geo_has_stickers(self.geo_mesh):

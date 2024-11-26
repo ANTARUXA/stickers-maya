@@ -42,7 +42,8 @@ class Builder:
             character_name (str, optional):
             Character name which has the geometry associated to the sticker. Defaults to "".
             sticker_definitions (list[Dict], optional):
-            List of dictionaries containing the necessary parameters to creathe each sticker . Defaults to None.
+            List of dictionaries containing the necessary parameters to
+            creathe each sticker . Defaults to None.
 
         """
         self.parser = parser.Parser()
@@ -53,7 +54,8 @@ class Builder:
         self.stickers = {}
 
     def create_stickers(self):
-        """Travels all stickers declared inside the class' sticker_definition and calls _create_sticker each time"""
+        """Travels all stickers declared inside the class' sticker_definition
+        and calls _create_sticker each time"""
         for definition in self.sticker_definitions:
             self._create_sticker(definition)
 
@@ -66,16 +68,13 @@ class Builder:
         sticker_obj.create()
         self.stickers.update(
             {
-                "{name}_{flag}{index}".format(
-                    name=definition.get("name"),
-                    flag=definition.get("flag"),
-                    index=definition.get("index"),
-                ): sticker_obj.sticker_data
+                definition.get('name'): sticker_obj.sticker_data
             }
         )
 
     def add_stickers(self, definition):
-        """Auxiliary function. Lets the User create more stickers at any point after the builder is constructed
+        """Auxiliary function. Lets the User create more stickers at any
+        point after the builder is constructed
 
         Args:
             definition (dict/list): Sticker creation parameters, can be a list fo definitions
