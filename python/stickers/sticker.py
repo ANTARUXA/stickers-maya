@@ -90,7 +90,7 @@ class Sticker:  # pylint: disable=too-many-instance-attributes
     def create_sticker_top_groups(self):
         """Crea los grupos principales del sticker
 
-        El grupo maestro, el que recibe el pointOnPoly Constrainty y el grupo maestro de capas
+        El grupo maestro, el que recibe el pointOnPoly Constraint y el grupo maestro de capas
         """
         # Create sticker's master group
         sticker_master_group = self.parser.create_group(self.root_name)
