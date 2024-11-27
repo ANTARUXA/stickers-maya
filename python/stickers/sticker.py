@@ -82,7 +82,6 @@ class Sticker:  # pylint: disable=too-many-instance-attributes
         self.create_attributes()
         self.create_constraints()
         self.create_offset_projection_subsystems()
-        # self.build_imagefile_dict()
         self.create_layer_shading_nodes()
         self.apply_to_material()
 
