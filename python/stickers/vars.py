@@ -45,22 +45,34 @@ INNIT_ATTR = {
             "type": "bool",
             "longName": "lookAtCamera",
             "niceName": "Orientar hacia Camara",
+            "keyable": False,
+            "channelBox": False,
         },
         {
             "type": "bool",
             "longName": "detachPlane",
-            "niceName": "Separar Plano"},
+            "niceName": "Separar Plano",
+            "keyable": False,
+            "channelBox": False,
+        },
         {
-            "type": "enum",
-            "longName": "layersSeparator",
-            "niceName": ENUM_NICE_NAME,
-            "enumName": "LAYERS:",
-            "channelBox": True,
+            "type": "bool",
+            "longName":"flipX",
+            "niceName": "Flip X",
+        },
+        {
+            "type": "bool",
+            "longName":"flipY",
+            "niceName": "Flip Y",
         },
     ],
-    LAYER_ATTRIBUTES: [{
-        "type": "long",
-        "longName": "{layerName}Texture",
-        "niceName": "{LayerName} Texture",
-    }],
+    LAYER_ATTRIBUTES: [
+        {
+            "type": "long",
+            "longName": "{layerName}Texture",
+            "niceName": "{LayerName} Texture",
+            "keyable": False,
+            "channelBox": False,
+        }
+    ],
 }

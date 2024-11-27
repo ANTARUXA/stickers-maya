@@ -20,7 +20,7 @@ class Sticker:  # pylint: disable=too-many-instance-attributes
     Posee todos los metodos para su creacion y manejo de datos.
     """
 
-    def __init__( self, name, layers=None, geometry=None, maps=None, file_path=None):
+    def __init__(self, name, layers=None, geometry=None, maps=None, file_path=None):
         self.parser = parser.Parser()
         self.file_path = file_path
         self.name = name
@@ -28,8 +28,7 @@ class Sticker:  # pylint: disable=too-many-instance-attributes
         self.texture_maps = maps if maps else []
         self.geometry = geometry if geometry else ""
         self.geo_mesh = self.geometry.split(".")[0]
-        self.root_name = "{name}_{description}".format(
-            description="sticker", name=name)
+        self.root_name = "{name}_{description}".format(description="sticker", name=name)
 
         self.sticker_data = {
             "self": self,
@@ -758,6 +757,55 @@ class Sticker:  # pylint: disable=too-many-instance-attributes
                 },
             ],
         )
+        name = "{0}_flipStickerX".format(sticker_prefix)
+        flipx_sticker_condition = self.parser.create_utility_node(
+            "condition",
+            node_name=name,
+            asUtility=True,
+            connections=[
+                {mainControl_attr_ref.get("flipX"): "{0}.firstTerm".format(name)},
+            ],
+            attributes={"secondTerm": 1, "colorIfTrueR": -1, "colorIfFalseR": 1},
+        )
+
+        name = "{0}_flipStickerY".format(sticker_prefix)
+        flipy_sticker_condition = self.parser.create_utility_node(
+            "condition",
+            node_name=name,
+            asUtility=True,
+            connections=[
+                {mainControl_attr_ref.get("flipY"): "{0}.firstTerm".format(name)},
+            ],
+            attributes={"secondTerm": 1, "colorIfTrueR": -1, "colorIfFalseR": 1},
+        )
+        name = "{0}_flipScaleSticker".format(sticker_prefix)
+        flip_scale_sticker = self.parser.create_utility_node(
+            "multiplyDivide",
+            node_name=name,
+            asUtility=True,
+            connections=[
+                {
+                    "{0}.outColorR".format(
+                        flipx_sticker_condition
+                    ): "{0}.input1.input1X".format(name)
+                },
+                {
+                    "{0}.outColorR".format(
+                        flipy_sticker_condition
+                    ): "{0}.input1.input1Y".format(name)
+                },
+                {
+                    "{0}.outputX".format(scaleInit_node): "{0}.input2.input2X".format(
+                        name
+                    )
+                },
+                {
+                    "{0}.outputY".format(scaleInit_node): "{0}.input2.input2Y".format(
+                        name
+                    )
+                },
+            ],
+        )
         for layer_definition in self.sticker_data[STICKER_SYSTEMS][
             SYSTEM_LAYERS
         ].values():
@@ -769,15 +817,15 @@ class Sticker:  # pylint: disable=too-many-instance-attributes
                         ): "{0}.scaleZ".format(layer_definition.get("scaleOffset"))
                     },
                     {
-                        "{0}.outputX".format(scaleInit_node): "{0}.scaleX".format(
-                            layer_definition.get("scaleOffset")
-                        )
+                        "{0}.outputY".format(
+                            flip_scale_sticker
+                        ): "{0}.scaleY".format(layer_definition.get("scaleOffset"))
                     },
                     {
-                        "{0}.outputY".format(scaleInit_node): "{0}.scaleY".format(
-                            layer_definition.get("scaleOffset")
-                        )
-                    },
+                        "{0}.outputX".format(
+                            flip_scale_sticker
+                        ): "{0}.scaleX".format(layer_definition.get("scaleOffset"))
+                    }
                 ]
             )
 
@@ -796,7 +844,7 @@ class Sticker:  # pylint: disable=too-many-instance-attributes
             # Call create_shading_nodes function to create shading nodes for each layer
             self.create_maps_shading_nodes(layer_name, p3d)
 
-    def create_maps_shading_nodes(self, layer_name, p3d,img_sequence=False):
+    def create_maps_shading_nodes(self, layer_name, p3d, img_sequence=False):
         """
         Creates file, projection & aiMatte nodes for each map declared in the sticker
         """
@@ -815,9 +863,11 @@ class Sticker:  # pylint: disable=too-many-instance-attributes
             # )
             #
             texture_map_file_path = self.file_path
-            frame_extension=False
+            frame_extension = False
             if img_sequence:
-                frame_extension = re.search(r"\.([\d]*)\.", texture_map_file_path).group(1)
+                frame_extension = re.search(
+                    r"\.([\d]*)\.", texture_map_file_path
+                ).group(1)
 
             _p2d, file_node = self.parser.create_file_node(
                 self.name,
@@ -826,7 +876,6 @@ class Sticker:  # pylint: disable=too-many-instance-attributes
                 texture_map_file_path,
                 frame_extension,
             )
-
 
             projection_node = self.parser.create_projection_node(
                 self.name, layer_name, texture_map, p3d, file_node
@@ -845,12 +894,12 @@ class Sticker:  # pylint: disable=too-many-instance-attributes
 
     def apply_to_material(self, layer="base", map="color"):
         """Applies materials to the layers"""
-        sticker_projection = (
-            self.sticker_data.get("projections").get(layer).get(map)
-        )
+        sticker_projection = self.sticker_data.get("projections").get(layer).get(map)
         new_material = self.parser.create_sticker_viewport_material(
             self.name, sticker_projection, self.geo_mesh
         )
 
         if self.parser.geo_has_stickers(self.geo_mesh):
-            self.parser.insert_new_sticker_to_material(self.geo_mesh,sticker_projection)
+            self.parser.insert_new_sticker_to_material(
+                self.geo_mesh, sticker_projection
+            )

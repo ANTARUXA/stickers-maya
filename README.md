@@ -72,14 +72,6 @@ Check the `Multi pose` checkbox and follow the same instructions as a
 
 ### Animation
 
-<!--The `sticker` object is located under the selected geometry. There is a root-->
-<!--node called `{sticker_name}_anchor_node` that 'anchors' the sticker to the-->
-<!--geometry. The `sticker` is essentially constrained to the surface of the-->
-<!--geometry, and it's movement will depend directly to that.-->
-
-<!--`{sticker_name}_base_node` which is the main controller node, holds the-->
-<!--principal attributes and can be animated.-->
-
 The `mainControl` is in charge of all the channles that can be animated.
 
 * Translation
@@ -101,23 +93,7 @@ The `mainControl` is in charge of all the channles that can be animated.
   Two custom attributes, `flip X` and `flip Y`, are meant to mirror the
   `sticker` horizontally or vertically.
 
-<!--* Transparency-->
-<!---->
-<!--  Controls the transparency of the sticker (0 - Opaque, 1 - Completely-->
-<!--  transparent)-->
-
-<!--### Delete a sticker-->
-<!---->
-<!--To delete a given sticker, go to the `Stickers` menu in the 3dview, write the-->
-<!--same unique name of the sticker and press `Remove sticker`.-->
-
 ## Extra functionality
-
-<!--### Move sticker up/down in render order-->
-<!---->
-<!--Inside the `shader editor`, the artist can use a panel to rearrange the-->
-<!--rendering order of all created stickers for the geometry (similar to 'move to-->
-<!--front/back' controls).-->
 
 ### Specific image selection (Multi-pose sticker)
 
@@ -128,10 +104,6 @@ sequence being linked by the current frame of the scene.
 By setting this attribute to any valid number for the image sequence, the
 `sticker` will render the selected image.
 
-
-<!--> [!TIP]-->
-<!-->We recommend to set the animation curves to 'CONSTANT' if you want to avoid-->
-<!-->interpolation shennanigans-->
 
 
 ## TODO:
