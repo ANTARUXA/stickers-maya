@@ -891,10 +891,10 @@ class Sticker:  # pylint: disable=too-many-instance-attributes
                 {texture_map: matte_marerial}
             )
 
-    def apply_to_material(self, layer="base", map="color"):
+    def apply_to_material(self, layer="base", texture_map="color"):
         """Applies materials to the layers"""
-        sticker_projection = self.sticker_data.get("projections").get(layer).get(map)
-        new_material = self.parser.create_sticker_viewport_material(
+        sticker_projection = self.sticker_data.get("projections").get(layer).get(texture_map)
+        _new_material = self.parser.create_sticker_viewport_material(
             self.name, sticker_projection, self.geo_mesh
         )
 
