@@ -6,8 +6,8 @@
    <rect>
     <x>0</x>
     <y>0</y>
-    <width>397</width>
-    <height>278</height>
+    <width>257</width>
+    <height>304</height>
    </rect>
   </property>
   <property name="windowTitle">
@@ -22,37 +22,6 @@
      <property name="labelAlignment">
       <set>Qt::AlignRight|Qt::AlignTrailing|Qt::AlignVCenter</set>
      </property>
-     <item row="0" column="0">
-      <widget class="QLabel" name="label_7">
-       <property name="text">
-        <string>Images Folder</string>
-       </property>
-      </widget>
-     </item>
-     <item row="0" column="1">
-      <layout class="QHBoxLayout" name="horizontalLayout_10">
-       <item>
-        <widget class="QLineEdit" name="folder_path_le">
-         <property name="text">
-          <string>/srv/projects/can/assets/zorra/surfaces/textures/publish/faciales/512/eye/txt_can_zorra_facial_512_eye_eyelids_color.000.png</string>
-         </property>
-        </widget>
-       </item>
-       <item>
-        <widget class="QPushButton" name="folder_path_pb">
-         <property name="maximumSize">
-          <size>
-           <width>40</width>
-           <height>16777215</height>
-          </size>
-         </property>
-         <property name="text">
-          <string>...</string>
-         </property>
-        </widget>
-       </item>
-      </layout>
-     </item>
      <item row="1" column="0">
       <widget class="QLabel" name="label_4">
        <property name="text">
@@ -68,7 +37,7 @@
           <bool>false</bool>
          </property>
          <property name="text">
-          <string>pSphere1.vtx[216]</string>
+          <string/>
          </property>
         </widget>
        </item>
@@ -103,37 +72,66 @@
      <item row="2" column="1">
       <widget class="QLineEdit" name="name_le">
        <property name="text">
-        <string>eye</string>
+        <string/>
        </property>
       </widget>
      </item>
-     <item row="3" column="1">
-      <spacer name="verticalSpacer">
-       <property name="orientation">
-        <enum>Qt::Vertical</enum>
+    </layout>
+   </item>
+   <item>
+    <widget class="QLabel" name="label_7">
+     <property name="text">
+      <string>Images Folder</string>
+     </property>
+    </widget>
+   </item>
+   <item>
+    <layout class="QHBoxLayout" name="horizontalLayout_10">
+     <item>
+      <widget class="QLineEdit" name="folder_path_le">
+       <property name="text">
+        <string/>
        </property>
-       <property name="sizeType">
-        <enum>QSizePolicy::Fixed</enum>
-       </property>
-       <property name="sizeHint" stdset="0">
+      </widget>
+     </item>
+     <item>
+      <widget class="QPushButton" name="folder_path_pb">
+       <property name="maximumSize">
         <size>
-         <width>20</width>
-         <height>20</height>
+         <width>40</width>
+         <height>16777215</height>
         </size>
        </property>
-      </spacer>
-     </item>
-     <item row="4" column="1">
-      <widget class="QCheckBox" name="img_seq_cb">
        <property name="text">
-        <string>Load as image sequence</string>
+        <string>...</string>
        </property>
       </widget>
      </item>
-     <item row="5" column="1">
-      <widget class="QCheckBox" name="anim_seq_">
+    </layout>
+   </item>
+   <item>
+    <layout class="QVBoxLayout" name="verticalLayout_2">
+     <item>
+      <widget class="QRadioButton" name="single_img_rb">
        <property name="text">
-        <string>Animated</string>
+        <string>Single Image</string>
+       </property>
+       <property name="checked">
+        <bool>true</bool>
+       </property>
+      </widget>
+     </item>
+     <item>
+      <widget class="QRadioButton" name="image_seq_rb">
+       <property name="text">
+        <string>Image Sequence</string>
+       </property>
+      </widget>
+     </item>
+     <item>
+      <widget class="QRadioButton" name="multi_pose_rb">
+       <property name="text">
+        <string>Multi Pose</string>
        </property>
       </widget>
      </item>

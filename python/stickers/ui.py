@@ -32,6 +32,7 @@ class StickerUI(QtWidgets.QDialog):
         self.init_ui()
         self.create_layout()
         self.create_connections()
+        self.frame_type = 0
 
     def init_ui(self):
         f = QtCore.QFile(os.path.join(os.path.dirname(__file__), "sticker_simple.ui"))
@@ -43,13 +44,21 @@ class StickerUI(QtWidgets.QDialog):
         f.close()
 
     def create_layout(self):
+        self.ui.setParent(self)
         self.ui.layout().setContentsMargins(6, 6, 6, 6)
+        layout = QtWidgets.QVBoxLayout()
+        layout.addWidget(self.ui)
+        self.resize(self.ui.size())
+        self.setLayout(layout)
 
     def create_connections(self):
         self.ui.folder_path_pb.clicked.connect(self.select_file)
         self.ui.geometry_pb.clicked.connect(self.set_geometry)
         self.ui.create_pb.clicked.connect(self.create_sticker)
         self.ui.cancel_pb.clicked.connect(self.close)
+        self.ui.single_img_rb.toggled.connect(self.set_frame_type)
+        self.ui.image_seq_rb.toggled.connect(self.set_frame_type)
+        self.ui.multi_pose_rb.toggled.connect(self.set_frame_type)
 
     #   ____ ____  _____    _  _____ _____   ____ _____ ___ ____ _  _______ ____
     #  / ___|  _ \| ____|  / \|_   _| ____| / ___|_   _|_ _/ ___| |/ / ____|  _ \
@@ -70,6 +79,7 @@ class StickerUI(QtWidgets.QDialog):
         definition["geometry"] = self.ui.geometry_le.text()
         definition["name"] = self.ui.name_le.text()
         definition["file_path"] = self.ui.folder_path_le.text()
+        definition["is_sequence"] = self.get_sequence_type()
 
         # Get all layers from the list widget
         definition["layers"] = [{"layerName": "base"}]
@@ -86,6 +96,19 @@ class StickerUI(QtWidgets.QDialog):
     #   | |__| |_| |_  | |  | |_| | | | | (__| |_| | (_) | | | \__ \
     #    \____/|_____| |_|   \__,_|_| |_|\___|\__|_|\___/|_| |_|___/
     #
+    def set_frame_type(self):
+        radio_button = self.sender()
+        radio_text = str(radio_button.text()).replace(" ","")
+        if radio_button.isChecked():
+            self.frame_type = radio_text
+
+    def get_sequence_type(self):
+        seq_type_dict = {
+            "SingleImage":0,
+            "ImageSequence":1,
+            "MultiPose":2
+        }
+        return seq_type_dict.get(self.frame_type,0)
 
     def set_geometry(self):
         """Set the geometry field to the selected object"""

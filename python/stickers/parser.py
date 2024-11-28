@@ -383,7 +383,8 @@ class Parser:
         texture_map,
         file_path,
         frame_extension,
-        activate_fe=0,
+        is_sequence=0,
+        extra_connection = None,
     ):
         # Connect a place2dtexture node to the file node
         place2dTexture = self.create_utility_node(
@@ -496,7 +497,7 @@ class Parser:
                 },
             ],
             attributes={
-                "useFrameExtension": activate_fe,
+                "useFrameExtension": is_sequence,
             },
         )
         if os.path.isfile(file_path):

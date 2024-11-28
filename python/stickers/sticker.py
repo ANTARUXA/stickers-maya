@@ -20,7 +20,7 @@ class Sticker:  # pylint: disable=too-many-instance-attributes
     Posee todos los metodos para su creacion y manejo de datos.
     """
 
-    def __init__(self, name, layers=None, geometry=None, maps=None, file_path=None):
+    def __init__(self, name, layers=None, geometry=None, maps=None, file_path=None, is_sequence=0):
         self.parser = parser.Parser()
         self.file_path = file_path
         self.name = name
@@ -29,6 +29,7 @@ class Sticker:  # pylint: disable=too-many-instance-attributes
         self.geometry = geometry if geometry else ""
         self.geo_mesh = self.geometry.split(".")[0]
         self.root_name = "{name}_{description}".format(description="sticker", name=name)
+        self.is_sequence = is_sequence
 
         self.sticker_data = {
             "self": self,
@@ -217,6 +218,9 @@ class Sticker:  # pylint: disable=too-many-instance-attributes
                     )
                     for key, value in attr_definition.items()
                 }
+
+                if self.is_sequence == 2:
+                    attr_definition.update({"keyable":True,"channelBox":True})
 
                 # Runs the parser and returns the created attribute
                 created_attr = self.parser.create_attribute(
@@ -843,27 +847,19 @@ class Sticker:  # pylint: disable=too-many-instance-attributes
             # Call create_shading_nodes function to create shading nodes for each layer
             self.create_maps_shading_nodes(layer_name, p3d)
 
-    def create_maps_shading_nodes(self, layer_name, p3d, img_sequence=False):
+    def create_maps_shading_nodes(self, layer_name, p3d):
         """
         Creates file, projection & aiMatte nodes for each map declared in the sticker
         """
-        # TODO: Replace file_list with single image
-        # file_list = self.get_images_from_sticker_folder()
-        # matched_textures_dict = {}
         for texture_map in self.texture_maps:
-            # name_match_pattern = "{0}_{1}".format(self.name, texture_map)
-            #
-            # matched_textures_dict[texture_map] = self.build_texture_maps_dict(
-            #     name_match_pattern, file_list
-            # )
-            #
-            # texture_map_file_path = os.path.join(
-            #     self.file_path, matched_textures_dict[texture_map][0]
-            # )
-            #
+            is_sequence = self.is_sequence
+            frame_extension = ""
+
             texture_map_file_path = self.file_path
-            frame_extension = False
-            if img_sequence:
+
+
+            if self.is_sequence == 2:
+                is_sequence = 1
                 frame_extension = re.search(
                     r"\.([\d]*)\.", texture_map_file_path
                 ).group(1)
@@ -874,7 +870,18 @@ class Sticker:  # pylint: disable=too-many-instance-attributes
                 texture_map,
                 texture_map_file_path,
                 frame_extension,
+                is_sequence,
             )
+            if self.is_sequence == 2:
+                self.parser._create_utility_connections([
+                    {
+                        "{0}.{1}Texture".format(
+                            self.sticker_data[STICKER_SYSTEMS]["mainControl"]["ctl"],
+                            layer_name
+
+                        ):"{0}.frameExtension".format(file_node)
+                    }
+                ])
 
             projection_node = self.parser.create_projection_node(
                 self.name, layer_name, texture_map, p3d, file_node
@@ -890,6 +897,51 @@ class Sticker:  # pylint: disable=too-many-instance-attributes
             self.sticker_data["materials"]["aiMatte"].update(
                 {texture_map: matte_marerial}
             )
+
+
+
+
+
+        # for texture_map in self.texture_maps:
+        #     # name_match_pattern = "{0}_{1}".format(self.name, texture_map)
+        #     #
+        #     # matched_textures_dict[texture_map] = self.build_texture_maps_dict(
+        #     #     name_match_pattern, file_list
+        #     # )
+        #     #
+        #     # texture_map_file_path = os.path.join(
+        #     #     self.file_path, matched_textures_dict[texture_map][0]
+        #     # )
+        #     #
+        #     texture_map_file_path = self.file_path
+        #     frame_extension = False
+        #     if img_sequence:
+        #         frame_extension = re.search(
+        #             r"\.([\d]*)\.", texture_map_file_path
+        #         ).group(1)
+        #
+        #     _p2d, file_node = self.parser.create_file_node(
+        #         self.name,
+        #         layer_name,
+        #         texture_map,
+        #         texture_map_file_path,
+        #         frame_extension,
+        #     )
+        #
+        #     projection_node = self.parser.create_projection_node(
+        #         self.name, layer_name, texture_map, p3d, file_node
+        #     )
+        #     matte_marerial = self.parser.create_aiMatte_material(
+        #         self.name, layer_name, texture_map, projection_node
+        #     )
+        #     ## Update sticker_data with the created nodes
+        #
+        #     self.sticker_data["projections"][layer_name].update(
+        #         {texture_map: projection_node}
+        #     )
+        #     self.sticker_data["materials"]["aiMatte"].update(
+        #         {texture_map: matte_marerial}
+        #     )
 
     def apply_to_material(self, layer="base", texture_map="color"):
         """Applies materials to the layers"""
